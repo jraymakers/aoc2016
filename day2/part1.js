@@ -30,14 +30,17 @@ let data = fs.readFileSync(process.argv[2], 'utf8');
 
 let lines = data.split('\n');
 
-function lineToButton(buttons, line) {
-  let pos = buttons[buttons.length - 1];
+function lineToButton(buttonSequence, line) {
+  let pos = buttonSequence[buttonSequence.length - 1];
+  console.log(buttonSequence)
   for (let movement of line) {
     pos = move(pos, movement);
   }
-  return buttons.concat(pos);
+  return buttonSequence.concat([pos]);
 }
 
-let buttonSequence = lines.reduce(lineToButton, [1, 1]);
+let buttonSequence = lines.reduce(lineToButton, [[1, 1]]);
 buttonSequence = buttonSequence.slice(1);
-console.log(buttons.join(''));
+
+let buttonNumbers = buttonSequence.map(pos => buttons[pos[1]][pos[0]]);
+console.log(buttonNumbers.join(''));
