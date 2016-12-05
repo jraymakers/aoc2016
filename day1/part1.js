@@ -13,7 +13,7 @@ function move(pos, dir, dist) {
     }
 }
 
-fs.readFile('input.txt', 'utf8', (err, data) => {
+fs.readFile(process.argv[2], 'utf8', (err, data) => {
   if (err) throw err;
   let pos = [0, 0];
   let dir = 0; // N = 0, E = 1, S = 2, W = 3

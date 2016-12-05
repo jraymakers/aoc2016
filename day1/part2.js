@@ -27,7 +27,7 @@ function move(pos, dir, dist, crumbs) {
   return pos;
 }
 
-fs.readFile('input.txt', 'utf8', (err, data) => {
+fs.readFile(process.argv[2], 'utf8', (err, data) => {
   if (err) throw err;
   let crumbs = { '0_0': true }; // x_y: true
   let pos = [0, 0];
