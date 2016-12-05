@@ -1,9 +1,11 @@
 const fs = require('fs');
 
 const buttons = [
-  [1, 2, 3],
-  [4, 5, 6],
-  [7, 8, 9]
+  [ null, null, 1  , null, null ],
+  [ null, 2   , 3  , 4   , null ],
+  [ 5   , 6   , 7  , 8   , 9    ],
+  [ null, 'A' , 'B', 'C' , null ],
+  [ null, null, 'D', null, null ]
 ];
 
 const dirMovements = {
@@ -23,7 +25,7 @@ function move(pos, dir) {
 function inRange(pos) {
   let [x, y] = pos;
   return x >= 0 && x < buttons[0].length &&
-    y >= 0 && y < buttons.length;
+    y >= 0 && y < buttons.length && buttons[y][x];
 }
 
 let data = fs.readFileSync(process.argv[2], 'utf8');
@@ -38,7 +40,7 @@ function lineToButton(buttonSequence, line) {
   return buttonSequence.concat([pos]);
 }
 
-let buttonSequence = lines.reduce(lineToButton, [[1, 1]]);
+let buttonSequence = lines.reduce(lineToButton, [[0, 2]]);
 buttonSequence = buttonSequence.slice(1);
 
 let buttonNumbers = buttonSequence.map(pos => buttons[pos[1]][pos[0]]);
