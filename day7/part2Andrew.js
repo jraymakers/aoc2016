@@ -1,12 +1,12 @@
 const fs = require('fs');
 
-function supportsTLS(ipAddress) {
+function supportsSSL(ipAddress) {
   let inHypernet = false;
 
-  let foundAbbaOutsideHypernet = false;
-  let foundAbbaInsideHypernet = false;
+  let abaSet = {};
+  let babSet = {};
 
-  for (let i = 0; i <= ipAddress.length - 4; i++) {
+  for (let i = 0; i <= ipAddress.length - 3; i++) {
 
     if (ipAddress[i] === '[') {
       if (inHypernet) throw 'Already in hypernet!';
@@ -15,19 +15,19 @@ function supportsTLS(ipAddress) {
       if (!inHypernet) throw 'Already out of hypernet!';
       inHypernet = false;
     } else {
-      let window = ipAddress.slice(i, i+4);
-      if (isAbba(window)) {
+      let window = ipAddress.slice(i, i+3);
+      if (isAba(window)) {
         if (inHypernet) {
-          foundAbbaInsideHypernet = true;
+          babSet[babToAba(window)] = true;
         } else {
-          foundAbbaOutsideHypernet = true;
+          abaSet[window] = true;
         }
       }
     }
   }
 
-  // Make sure the last 3 characters are well-formed
-  for(let char of ipAddress.slice(-3)) {
+  // Make sure the last 2 characters are well-formed
+  for(let char of ipAddress.slice(-2)) {
     if (char === '[') {
       if (inHypernet) throw 'Already in hypernet!';
       inHypernet = true;
@@ -38,11 +38,21 @@ function supportsTLS(ipAddress) {
   }
 
   if (inHypernet) throw 'String never closes hypernet!';
-  return foundAbbaOutsideHypernet && !foundAbbaInsideHypernet;
+
+  for (aba in abaSet) {
+    if (babSet[aba]) return true;
+  }
+  return false;
 }
 
-function isAbba(window) {
-  return window[0] === window[3] && window[1] === window[2] && window[0] !== window[1];
+const brackets = '[]';
+function isAba(window) {
+  return window[0] === window[2] && window[0] !== window[1] &&
+      !brackets.includes(window[0]) && !brackets.includes(window[1]);
+}
+
+function babToAba(window) {
+  return [window[1], window[0], window[1]].join('');
 }
 
 const fileText = fs.readFileSync(process.argv[2], 'utf8');
@@ -50,8 +60,8 @@ const lines = fileText.split('\n');
 
 let counter = 0;
 for (line of lines) {
-  let hasTLS = supportsTLS(line);
-  if (hasTLS) counter++;
+  let hasSSL = supportsSSL(line);
+  if (hasSSL) counter++;
 }
 
 console.log(counter);
