@@ -20,6 +20,8 @@ function multihash(s) {
 let hashes = [];
 function getHash(index) {
   if (!hashes[index]) {
+    // Single hash for part 1, multi hash for part 2
+    // hashes[index] = getSingleHash(input+index);
     hashes[index] = multihash(input+index);
   }
   return hashes[index];
