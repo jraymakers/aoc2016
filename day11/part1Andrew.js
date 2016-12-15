@@ -18,10 +18,14 @@ function parseInitialState(lines) {
     transition: null,
     elevatorFloor: 1,
     items
-  }
+  };
 }
 
 function newStateFromTransition(prevState, itemsToMove, dir) {
+  if (!itemsToMove || itemsToMove.length === 0) {
+    throw 'No items to move in state transition!';
+  }
+
   let newFloor = prevState.elevatorFloor + dir;
   let newItems = _.clone(prevState.items);
   for (item of itemsToMove) {
@@ -59,7 +63,20 @@ function isValidState(state) {
   });
 }
 
-function enqueueTransitionsForDirection(queue, state, itemCombos, dir) {
+function isSameElement(items) {
+  let firstChar = items[0][0];
+  return _.all(items, item => item[0] === firstChar);
+}
+
+function markTransitionStatesAsSeenForDirection(seenStates, state, itemCombos, dir) {
+  let transitionStates = _(itemCombos).map(combo => newStateFromTransition(state, combo, dir));
+  for (transitionState of transitionStates) {
+    let stateKey = keyForState(transitionState);
+    seenStates[stateKey] = transitionState.parentKey;
+  }
+}
+
+function enqueueTransitionsForDirection(queue, seenStates, state, itemCombos, dir) {
   let transitionStates = _(itemCombos).map(combo => newStateFromTransition(state, combo, dir));
   for (transitionState of transitionStates) {
     if (isValidState(transitionState)) {
@@ -68,28 +85,47 @@ function enqueueTransitionsForDirection(queue, state, itemCombos, dir) {
   }
 }
 
-function enqueueTransitions(queue, state, destFloor) {
+function enqueueTransitions(queue, seenStates, state, destFloor) {
   let itemsByFloor = _(_.keys(state.items)).groupBy(item => state.items[item]);
   let itemsOnFloor = itemsByFloor[state.elevatorFloor];
-  let itemCombos = [];
+  
+  let singleItemCombos = [];  
   for (let i = 0; i < itemsOnFloor.length; i++) {
-    // Get both single and double item combos
-    itemCombos.push([ itemsOnFloor[i] ]);
+    singleItemCombos.push([ itemsOnFloor[i] ]);
+  }
+
+  let doubleItemCombos = [];
+  let noopCombos = [];
+  let foundPair = false;
+  for (let i = 0; i < itemsOnFloor.length; i++) {
     for (let j = i+1; j < itemsOnFloor.length; j++) {
-      itemCombos.push([ itemsOnFloor[i], itemsOnFloor[j] ]);
+      let twoItems = [ itemsOnFloor[i], itemsOnFloor[j] ];
+      let isPair = isSameElement(twoItems);
+      if (!foundPair && isPair) {
+        // Enqueue only the first pair found
+        foundPair = true;
+        doubleItemCombos.push(twoItems);
+      } else if (isPair) {
+        noopCombos.push(twoItems);
+      } else if (!isPair) {
+        doubleItemCombos.push(twoItems);
+      }
     }
   }
 
   let floorMin = Math.min(_.min(state.items), destFloor);
   let floorMax = Math.max(_.max(state.items), destFloor);
 
-  if (state.elevatorFloor < floorMax) {
-    enqueueTransitionsForDirection(queue, state, itemCombos, 1);
-  }
+  let canMoveUp = state.elevatorFloor < floorMax;
+  let canMoveDown = state.elevatorFloor > floorMin;
 
-  if (state.elevatorFloor > _.min(state.items)) {
-    enqueueTransitionsForDirection(queue, state, itemCombos, -1);
-  }
+  // Enqueue in a specific order to favor the more likely solutions first
+  canMoveUp && enqueueTransitionsForDirection(queue, seenStates, state, doubleItemCombos, 1);
+  canMoveDown && enqueueTransitionsForDirection(queue, seenStates, state, singleItemCombos, -1);
+  canMoveUp && enqueueTransitionsForDirection(queue, seenStates, state, singleItemCombos, 1);
+  // canMoveDown && enqueueTransitionsForDirection(queue, seenStates, state, doubleItemCombos, -1);
+
+  canMoveUp && markTransitionStatesAsSeenForDirection(seenStates, state, noopCombos, 1);
 }
 
 function isConsolidatedOnFloor(state, floor) {
@@ -109,16 +145,22 @@ function traceThroughStates(seenStates, seenStatesTransitions, finalStateKey) {
 }
 
 function findPathToFloor(initialState, destFloor) {
+  const queue = [ initialState ];
+  let state = initialState;
+  let stateKey = keyForState(state);
   let seenStates = {};
   let seenStatesTransitions = {};
-  const queue = [ initialState ];
-  let state, stateKey;
+
+  let statesConsidered = 0;
 
   while (queue.length > 0) {
     state = queue.shift();
+    statesConsidered++;
 
     stateKey = keyForState(state);
-    if (stateKey in seenStates) continue;
+    if (stateKey in seenStates) {
+      continue;
+    }
     seenStates[stateKey] = state.parentKey;
     seenStatesTransitions[stateKey] = state.transition;
 
@@ -126,10 +168,11 @@ function findPathToFloor(initialState, destFloor) {
       break;
     }
 
-    enqueueTransitions(queue, state, destFloor);
+    enqueueTransitions(queue, seenStates, state, destFloor);
   }
 
   return {
+    statesConsidered,
     finalState: state,
     trace: traceThroughStates(seenStates, seenStatesTransitions, stateKey)
   };
@@ -140,15 +183,8 @@ function findPathToFloor(initialState, destFloor) {
   console.log('Initial state:');
   console.log(initialState);
 
-  let floor3Result = findPathToFloor(initialState, 3);
-  console.log(floor3Result.trace);
-  console.log(`${floor3Result.trace.length - 1} steps`);
-
-  let newInitialState = _.clone(floor3Result.finalState);
-  newInitialState.parentKey = null;
-  newInitialState.transition = null;
-
-  let floor4Result = findPathToFloor(newInitialState, 4);
-  console.log(floor4Result.trace);
-  console.log(`${floor4Result.trace.length - 1} steps`);
+  let result = findPathToFloor(initialState, 4);
+  console.log(result.trace);
+  console.log(`Considered ${result.statesConsidered} states`);
+  console.log(`${result.trace.length - 1} steps`);
 })();
